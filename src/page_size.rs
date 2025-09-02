@@ -1,6 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg(feature = "bincode")]
-#[derive(bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 pub enum PageSize {
     _4KiB,
     _2MiB,
