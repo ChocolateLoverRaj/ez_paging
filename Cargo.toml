@@ -1,0 +1,18 @@
+[package]
+name = "ez_paging"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bincode = { version = "2.0.1", optional = true, default-features = false, features = [
+    "derive",
+] }
+raw-cpuid = { version = "11.5.0", default-features = false }
+x86_64 = { git = "https://github.com/rust-osdev/x86_64", branch = "next", version = "0.15.2", default-features = false, features = [
+    "instructions",
+    "step_trait",
+] }
+
+[features]
+bincode = ["dep:bincode"]
+default = ["bincode"]
