@@ -2,7 +2,7 @@ use core::{ops::RangeInclusive, ptr::NonNull};
 
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
-    structures::paging::{PageTable, PageTableIndex, PhysFrame},
+    structures::paging::{PageTable, PageTableIndex},
 };
 
 use crate::*;
@@ -38,14 +38,14 @@ impl L4Type {
 
 #[derive(Debug)]
 pub struct ManagedL4PageTable {
-    pub(super) frame: PhysFrame,
+    pub(super) frame: Owned4KibFrame,
     pub(super) _type: L4Type,
     pub(super) config: PagingConfig,
 }
 
 /// # Safety
 /// Frame will be zeroed
-unsafe fn init_page_table(frame: PhysFrame, config: &PagingConfig) {
+unsafe fn init_page_table(frame: &mut Owned4KibFrame, config: &PagingConfig) {
     let ptr = NonNull::new(
         frame
             .start_address()
@@ -64,11 +64,8 @@ impl PagingConfig {
     /// You will only be allowed to use the higher half of the virtual address space.
     ///
     /// This method also zeroes the frame.
-    ///
-    /// # Safety
-    /// You must "own" the frame (nothing else can reference it)
-    pub unsafe fn new_kernel(self, frame: PhysFrame) -> ManagedL4PageTable {
-        unsafe { init_page_table(frame, &self) };
+    pub fn new_kernel(self, mut frame: Owned4KibFrame) -> ManagedL4PageTable {
+        unsafe { init_page_table(&mut frame, &self) };
         ManagedL4PageTable {
             frame,
             _type: L4Type::Kernel(KernelL4Data {
@@ -84,9 +81,7 @@ impl ManagedL4PageTable {
     /// You will only be able to use the lower half of the virtual address space.
     ///
     /// This method also zeroes the frame.
-    /// # Safety
-    /// You must "own" the frame (nothing else can reference it)
-    pub unsafe fn new_user(&mut self, frame: PhysFrame) -> Self {
+    pub fn new_user(&mut self, mut frame: Owned4KibFrame) -> Self {
         match &mut self._type {
             L4Type::User => {
                 panic!("self must be a kernel's l4 frame to copy from it")
@@ -95,26 +90,23 @@ impl ManagedL4PageTable {
                 *is_referenced = true;
             }
         };
-        unsafe { init_page_table(frame, &self.config) };
+        unsafe { init_page_table(&mut frame, &self.config) };
         let mut lower_half = Self {
             frame,
             _type: L4Type::User,
             config: self.config,
         };
         let range_to_copy = self._type.l4_managed_entry_range();
-        let kernel_page_table = unsafe { self.page_table_mut().as_mut() };
-        let user_page_table = unsafe { lower_half.page_table_mut().as_mut() };
+        let kernel_page_table = unsafe { self.page_table().as_mut() };
+        let user_page_table = unsafe { lower_half.page_table().as_mut() };
         for index in range_to_copy {
             user_page_table[index].clone_from(&kernel_page_table[index]);
         }
         lower_half
     }
 
-    pub fn frame(&self) -> PhysFrame {
-        self.frame
-    }
-
-    fn page_table_mut(&mut self) -> NonNull<PageTable> {
+    /// If you choose to manually modify page table entries, be careful, because it could create valid page tables that will cause problems because this crate doesn't expect handle.
+    pub fn page_table(&mut self) -> NonNull<PageTable> {
         NonNull::new(
             self.frame
                 .start_address()
@@ -126,7 +118,7 @@ impl ManagedL4PageTable {
 
     pub(super) fn table_mut(&mut self) -> PageTableWithLevelMut {
         PageTableWithLevelMut {
-            page_table: self.page_table_mut(),
+            page_table: self.page_table(),
             level: PageTableLevel::L4,
             l4: self,
         }
@@ -135,6 +127,10 @@ impl ManagedL4PageTable {
     /// # Safety
     /// Changes Cr3 value
     pub unsafe fn switch_to(&self, flags: Cr3Flags) {
-        unsafe { Cr3::write(self.frame, flags) };
+        unsafe { Cr3::write(self.frame.0, flags) };
+    }
+
+    pub fn frame(&self) -> &Owned4KibFrame {
+        &self.frame
     }
 }

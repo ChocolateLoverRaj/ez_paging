@@ -1,6 +1,5 @@
 use core::ptr::NonNull;
 
-use raw_cpuid::CpuId;
 use x86_64::structures::paging::{
     PageTable, PageTableFlags, PhysFrame, page_table::PageTableEntry,
 };
@@ -105,11 +104,7 @@ impl PageTableEntryWithLevelMut<'_> {
         if !level_frame_match {
             return Err(SetFrameError::NotAllowed);
         }
-        if frame.size() == PageSize::_1GiB
-            && !CpuId::new()
-                .get_extended_processor_and_feature_identifiers()
-                .is_some_and(|info| info.has_1gib_pages())
-        {
+        if frame.size() > max_page_size() {
             return Err(SetFrameError::PageSizeNotSupported);
         }
         self.entry
