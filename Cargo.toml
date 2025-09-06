@@ -2,6 +2,13 @@
 name = "ez_paging"
 version = "0.1.0"
 edition = "2024"
+authors = ["ChocolateLoverRaj <paranjperajas@gmail.com>"]
+repository = "https://github.com/ChocolateLoverRaj/ez_paging"
+license = "MIT"
+exclude = ["flake.nix", "flake.lock", ".envrc"]
+categories = ["no-std"]
+keywords = ["osdev", "x86", "paging"]
+description = "A Rust OSDev library for easily and safely managing page tables"
 
 [dependencies]
 bincode = { version = "2.0.1", optional = true, default-features = false, features = [
